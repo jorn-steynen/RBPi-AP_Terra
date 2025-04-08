@@ -1,0 +1,15 @@
+[Unit]
+Description=MPPT to MQTT Service
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/uganda2/uganda_tests/solar_readout/read_mppt.py
+Restart=always
+RestartSec=10
+User=uganda2
+WorkingDirectory=/home/uganda2/uganda_tests/solar_readout/
+StandardOutput=append:/dev/shm/logs/mppt-mqtt.log
+StandardError=append:/dev/shm/logs/mppt-mqtt.log
+
+[Install]
+WantedBy=multi-user.target
