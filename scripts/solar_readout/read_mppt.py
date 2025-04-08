@@ -4,7 +4,7 @@ import paho.mqtt.client as mqtt
 import serial
 import glob
 import time
-import logging
+# import logging
 
 MQTT_BROKER = "mqtt.iot-ap.be"
 MQTT_PORT = 1883
@@ -16,7 +16,7 @@ last_values = {
     "IL": None, "H19": None, "H20": None, "H21": None, "H22": None, "HSDS": None
 }
 
-logging.basicConfig(filename="/dev/shm/logs/mppt.log", level=logging.INFO, format="%(asctime)s - %(message)s")
+# logging.basicConfig(filename="/dev/shm/logs/mppt.log", level=logging.INFO, format="%(asctime)s - %(message)s")
 
 def on_connect(client, userdata, flags, rc):
     print(f"[MQTT] Connected with result code {rc}")
@@ -83,7 +83,7 @@ def connect_mqtt():
 def read_mppt():
     ser = connect_serial()
     client = connect_mqtt()
-    update_interval = 15  # Publish every 15 seconds
+    update_interval = 10  # Publish every x seconds
     last_publish = time.time()
 
     try:
@@ -99,7 +99,7 @@ def read_mppt():
             current_time = time.time()
             if current_time - last_publish >= update_interval:
                 payload = ",".join(str(last_values[k]) if last_values[k] is not None else "0" for k in last_values)
-                logging.info(f"Published: {payload}")
+                #logging.info(f"Published: {payload}")
                 client.publish(MQTT_TOPIC, payload, qos=1)
                 print(f"[MQTT] Published: {MQTT_TOPIC} → {payload}")
                 last_publish = current_time
