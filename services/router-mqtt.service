@@ -3,11 +3,11 @@ Description=LTE Router SNMP to MQTT Service
 After=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 /home/uganda2/uganda_tests/antenna_readout/router.py
+ExecStart=/usr/bin/python3 /home/uganda2/uganda_tests/scripts/antenna_readout/router.py
 Restart=always
 User=uganda2
 Group=uganda2
-WorkingDirectory=/home/uganda2/uganda_tests/antenna_readout
+WorkingDirectory=/home/uganda2/uganda_tests/scripts/antenna_readout
 
 [Install]
 WantedBy=multi-user.target
