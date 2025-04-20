@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
-import RPi.GPIO as GPIO
+import subprocess
 import sys
+import fcntl
+import os
 
-GPIO_PIN = 3  # GPIO pin 3 (BCM numbering)
+GPIO_PIN = 3  # GPIO 3 (BCM numbering, physical pin 5)
+LOCK_FILE = "/tmp/toggle_device.lock"
 
-# Set up the GPIO pin
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(GPIO_PIN, GPIO.OUT)
+# Acquire a lock to prevent multiple instances from running
+lock_fd = open(LOCK_FILE, "w")
+try:
+    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+except IOError:
+    print("Another instance of toggle_device.py is already running. Exiting.")
+    sys.exit(1)
 
 # Toggle the device based on the command-line argument
 try:
@@ -16,11 +23,13 @@ try:
 
     state = sys.argv[1]
     if state == "on":
-        GPIO.output(GPIO_PIN, GPIO.HIGH)
-        print("Device powered ON (GPIO 3 set HIGH)")
+        subprocess.run(["raspi-gpio", "set", str(GPIO_PIN), "op", "dh"], check=True)
+        print("Device powered ON (GPIO 18 set HIGH)")
     else:
-        GPIO.output(GPIO_PIN, GPIO.LOW)
-        print("Device powered OFF (GPIO 3 set LOW)")
+        subprocess.run(["raspi-gpio", "set", str(GPIO_PIN), "op", "dl"], check=True)
+        print("Device powered OFF (GPIO 18 set LOW)")
 
 finally:
-    GPIO.cleanup()  # Reset GPIO pins to avoid warnings in future runs
+    fcntl.flock(lock_fd, fcntl.LOCK_UN)  # Release the lock
+    lock_fd.close()
+    os.remove(LOCK_FILE)  # Remove the lock file
