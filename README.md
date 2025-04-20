@@ -58,3 +58,24 @@ Contributions are welcome! If you want to suggest improvements or report bugs, f
 - The setup is optimized for power efficiency and long-term outdoor deployment.
 - Data is transmitted via 4G and accessed remotely over a VPN.
 
+---
+
+## 🧰 Useful Git Commands
+
+```bash
+# Clone the repository
+git clone https://github.com/jorn-steynen/RBPi-AP_Terra.git
+
+# Check the status of your changes
+git status
+
+# Add and commit local changes
+git add .
+git commit -m "Your message"
+
+# Pull latest changes from GitHub
+git pull origin main
+
+# Push your changes back to GitHub
+git push origin main
+
