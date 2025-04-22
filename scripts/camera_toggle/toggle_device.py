@@ -1,42 +1,37 @@
 #!/usr/bin/env python3
-import RPi.GPIO as GPIO
+import subprocess
 import sys
 import os
-import fcntl
+from datetime import datetime
 
 GPIO_PIN = 3  # BCM numbering (physical pin 5)
-LOCK_FILE = "/tmp/toggle_device.lock"
+LOG_FILE = "/mnt/ssd/logs/toggle_device.log"
 
-# Acquire lock to avoid concurrent executions
-lock_fd = open(LOCK_FILE, "w")
-try:
-    fcntl.flock(lock_fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-except IOError:
-    print("Another instance is already running. Exiting.")
+# Ensure log directory exists
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+
+def log(message):
+    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    with open(LOG_FILE, "a") as logf:
+        logf.write(f"{timestamp} - {message}\n")
+
+def usage():
+    print("Usage: toggle_device.py [on|off]")
     sys.exit(1)
 
-# GPIO setup
-GPIO.setwarnings(False)
-GPIO.setmode(GPIO.BCM)
-GPIO.setup(GPIO_PIN, GPIO.OUT)
+if len(sys.argv) != 2 or sys.argv[1] not in ["on", "off"]:
+    usage()
 
-# Command-line parsing
+state = sys.argv[1]
+action = "dh" if state == "on" else "dl"
+
 try:
-    if len(sys.argv) != 2 or sys.argv[1] not in ["on", "off"]:
-        print("Usage: toggle_device.py [on|off]")
-        sys.exit(1)
-
-    state = sys.argv[1]
-    if state == "on":
-        GPIO.output(GPIO_PIN, GPIO.HIGH)
-        print(f"Device powered ON (GPIO {GPIO_PIN} set HIGH)")
-    else:
-        GPIO.output(GPIO_PIN, GPIO.LOW)
-        print(f"Device powered OFF (GPIO {GPIO_PIN} set LOW)")
-
-finally:
-    GPIO.cleanup(GPIO_PIN)
-    fcntl.flock(lock_fd, fcntl.LOCK_UN)
-    lock_fd.close()
-    os.remove(LOCK_FILE)
+    subprocess.run(["raspi-gpio", "set", str(GPIO_PIN), "op", action], check=True)
+    status = subprocess.check_output(["raspi-gpio", "get", str(GPIO_PIN)], text=True).strip()
+    print(f"Device powered {'ON' if state == 'on' else 'OFF'} ({status})")
+    log(f"Toggled {state.upper()} - {status}")
+except Exception as e:
+    log(f"Error toggling GPIO: {e}")
+    print(f"Failed to toggle device: {e}")
+    sys.exit(1)
 
