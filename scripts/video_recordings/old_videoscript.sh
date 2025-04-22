@@ -4,7 +4,6 @@
 RTSP_URL="rtsp://admin:DitIsGoed@192.168.100.252:554/Streaming/Channels/101"
 VIDEO_DIR="/media/usb/videos"  # Default, will be overridden
 LOG_FILE="/media/usb/logs/video_capture.log"  # Default, will be overridden
-STATUS_FILE="/mnt/ssd/status/video.status"
 SERVER_IP="10.8.0.6" # External server IP
 SERVER_USER="ape"
 SERVER_PATH="/home/ape/uganda_tests/video2"
@@ -18,33 +17,34 @@ SSD_DEVICE="/dev/sda1"  # Adjust based on lsblk output
 # Check if SSD is mounted
 if mountpoint -q "$SSD_MOUNT_POINT"; then
     echo "[INFO] SSD is already mounted at $SSD_MOUNT_POINT."
+    # Ensure USER can write to it
     sudo chown uganda2:uganda2 "$SSD_MOUNT_POINT"
     VIDEO_DIR="$SSD_MOUNT_POINT/videos"
     LOG_FILE="$SSD_MOUNT_POINT/logs/video_capture.log"
-    STATUS_FILE="$SSD_MOUNT_POINT/status/video.status"
 else
     echo "[WARNING] SSD not mounted. Attempting to mount..."
+
+    # Ensure mount point exists
     sudo mkdir -p "$SSD_MOUNT_POINT"
+
+    # Attempt to mount the SSD with error output for diagnostics
     if output=$(sudo mount -t ext4 "$SSD_DEVICE" "$SSD_MOUNT_POINT" 2>&1); then
         echo "[INFO] Successfully mounted SSD at $SSD_MOUNT_POINT."
-        sudo chown uganda2:uganda2 "$SSD_MOUNT_POINT"
+        sudo chown uganda2:uganda2 "$SSD_MOUNT_POINT"  # Ensure USER can write
         VIDEO_DIR="$SSD_MOUNT_POINT/videos"
         LOG_FILE="$SSD_MOUNT_POINT/logs/video_capture.log"
-        STATUS_FILE="$SSD_MOUNT_POINT/status/video.status"
     else
         echo "[ERROR] Failed to mount SSD: $output"
         echo "[ERROR] Falling back to RAM storage at $TEMP_DIR."
         VIDEO_DIR="$TEMP_DIR/videos"
         LOG_FILE="$TEMP_DIR/logs/video_capture.log"
-        STATUS_FILE="$TEMP_DIR/status/video.status"
     fi
 fi
 
-mkdir -p "$(dirname "$LOG_FILE")" "$(dirname "$STATUS_FILE")"
-exec > >(tee -a "$LOG_FILE") 2>&1
-
+# Display final storage location
 echo "[INFO] Using $VIDEO_DIR for video storage."
 
+# Ensure time is synced
 echo "[INFO] Synchronizing time..."
 sudo chronyc waitsync
 if [ $? -eq 0 ]; then
@@ -54,14 +54,28 @@ else
     echo "$(date +"%Y-%m-%d %H:%M:%S") - [ERROR] Time sync failed." >> "$LOG_FILE"
 fi
 
-mkdir -p "$VIDEO_DIR" "$VIDEO_DIR/pending_uploads"
+# Create necessary directories
+mkdir -p "$VIDEO_DIR" "$(dirname "$LOG_FILE")" "$VIDEO_DIR/pending_uploads"
 
+# Check internet connection before attempting upload
 echo "[INFO] Checking internet connectivity..."
 if ! ping -c 2 8.8.8.8 &> /dev/null; then
     echo "[WARNING] No internet connection. Saving file for later transfer."
     echo "$(date +"%Y-%m-%d %H:%M:%S") - [WARNING] No internet connection detected." >> "$LOG_FILE"
 fi
 
+# Check disk space before capturing
+#AVAILABLE_SPACE=$(df "$VIDEO_DIR" | tail -1 | awk '{print $4}')
+#MIN_REQUIRED_SPACE=50000  # Minimum space in KB (adjust as needed)
+
+#if [ "$AVAILABLE_SPACE" -lt "$MIN_REQUIRED_SPACE" ]; then
+#    echo "[ERROR] Not enough disk space to capture video. Required: $MIN_REQUIRED_SPACE KB, Available: $AVAILABLE_SPACE KB"
+#   agnes echo "$(date +"%Y-%m-%d %H:%M:%S") - [ERROR] Insufficient disk space." >> "$LOG_FILE"
+#    sudo reboot
+#fi
+
+
+# Capture video and retry ffmpeg capture up to 3 times if it fails
 TIMESTAMP=$(date +"%Y%m%d_%H%M%S")
 VIDEO_FILE="$VIDEO_DIR/video_$TIMESTAMP.mp4"
 CAPTURE_ATTEMPTS=0
@@ -71,29 +85,28 @@ until ffmpeg -rtsp_transport tcp -use_wallclock_as_timestamps 1 -i "$RTSP_URL" -
     ((CAPTURE_ATTEMPTS++))
     echo "[ERROR] ffmpeg capture failed. Attempt $CAPTURE_ATTEMPTS/$MAX_CAPTURE_RETRIES."
     echo "$(date +"%Y-%m-%d %H:%M:%S") - [ERROR] ffmpeg capture failed on attempt $CAPTURE_ATTEMPTS." >> "$LOG_FILE"
-    echo "ERROR $(date -Iseconds) ffmpeg capture failed (attempt $CAPTURE_ATTEMPTS)" > "$STATUS_FILE"
     if [ "$CAPTURE_ATTEMPTS" -ge "$MAX_CAPTURE_RETRIES" ]; then
         echo "[ERROR] Max retries reached. Skipping this cycle."
-        echo "ERROR $(date -Iseconds) Max capture retries reached" > "$STATUS_FILE"
         exit 1
     fi
     sleep 2
 done
 
+# Verify video integrity
 if [ ! -s "$VIDEO_FILE" ]; then
     echo "[ERROR] Video file is empty or missing: $VIDEO_FILE"
     echo "$(date +"%Y-%m-%d %H:%M:%S") - [ERROR] Video file is empty or missing: $VIDEO_FILE" >> "$LOG_FILE"
-    echo "ERROR $(date -Iseconds) empty or missing video file" > "$STATUS_FILE"
     exit 1
 fi
 
 if ! ffprobe "$VIDEO_FILE" > /dev/null 2>&1; then
     echo "[ERROR] Corrupted video file detected: $VIDEO_FILE"
     echo "$(date +"%Y-%m-%d %H:%M:%S") - [ERROR] Corrupted video file detected: $VIDEO_FILE" >> "$LOG_FILE"
-    echo "ERROR $(date -Iseconds) corrupted video file" > "$STATUS_FILE"
     exit 1
 fi
 
+
+# Upload the video with retry logic
 MAX_RETRIES=3
 RETRY_COUNT=0
 
@@ -104,18 +117,28 @@ until rsync -avz --partial --progress "$VIDEO_FILE" "$SERVER_USER@$SERVER_IP:$SE
     if [ "$RETRY_COUNT" -ge "$MAX_RETRIES" ]; then
         echo "[WARNING] Data transfer failed after $MAX_RETRIES attempts. Saving file for later transfer."
         mv "$VIDEO_FILE" "$VIDEO_DIR/pending_uploads/"
-        echo "ERROR $(date -Iseconds) rsync failed, file moved to pending_uploads" > "$STATUS_FILE"
         break
     fi
     echo "[ERROR] Data transfer failed. Retrying in 3 seconds... ($RETRY_COUNT/$MAX_RETRIES)"
     sleep 3
 done
 
+# Clean up if upload was successful
 if [ ! -f "$VIDEO_DIR/pending_uploads/$(basename $VIDEO_FILE)" ]; then
     echo "[INFO] Cleaning up uploaded video..."
     rm -f "$VIDEO_FILE"
 fi
 
+# Clean up if upload was successful (andere optie)
+#if ssh "$SERVER_USER@$SERVER_IP" "test -f $SERVER_PATH/$(basename $VIDEO_FILE)"; then
+#    echo "[INFO] Verified upload on server. Cleaning up local copy..."
+#    rm -f "$VIDEO_FILE"
+#else
+#    echo "[WARNING] Upload might not have completed. Keeping file for now."
+#fi
+
+
+# Attempt to upload any pending files from previous sessions
 echo "[INFO] Checking for pending uploads..."
 for FILE in "$VIDEO_DIR/pending_uploads/"*; do
     [ -e "$FILE" ] || continue
@@ -126,12 +149,15 @@ for FILE in "$VIDEO_DIR/pending_uploads/"*; do
     else
         echo "[ERROR] Failed to upload pending file: $(basename "$FILE")"
         echo "$(date +"%Y-%m-%d %H:%M:%S") - [ERROR] Failed to upload pending file: $(basename "$FILE")" >> "$LOG_FILE"
-        echo "ERROR $(date -Iseconds) pending upload failed: $(basename "$FILE")" > "$STATUS_FILE"
     fi
 done
 
-# Success status update
-if [ -f "$VIDEO_FILE" ] && [ ! -f "$VIDEO_DIR/pending_uploads/$(basename $VIDEO_FILE)" ]; then
-    echo "OK $(date -Iseconds) last_video=$(basename "$VIDEO_FILE")" > "$STATUS_FILE"
+# If SSD was mounted during this script, unmount it on exit
+if [ "$VIDEO_DIR" = "$SSD_MOUNT_POINT/videos" ]; then
+    echo "[INFO] Unmounting SSD from $SSD_MOUNT_POINT..."
+    sudo umount "$SSD_MOUNT_POINT" && echo "[INFO] SSD unmounted successfully." || echo "[WARNING] Failed to unmount SSD."
 fi
 
+# Shutdown gracefully to save power
+# echo "[INFO] Shutting down to conserve power..."
+# sudo shutdown now

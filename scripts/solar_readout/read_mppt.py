@@ -4,23 +4,33 @@ import paho.mqtt.client as mqtt
 import serial
 import glob
 import time
-# import logging
+import logging
+import os
+from datetime import datetime
 
 MQTT_BROKER = "mqtt.iot-ap.be"
 MQTT_PORT = 1883
 MQTT_TOPIC = "mppt/data2"
 BAUD_RATE = 19200
 
+LOG_FILE = "/mnt/ssd/logs/mppt.log"
+STATUS_FILE = "/mnt/ssd/status/mppt.status"
+os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+os.makedirs(os.path.dirname(STATUS_FILE), exist_ok=True)
+
+logging.basicConfig(filename=LOG_FILE, level=logging.INFO, format="%(asctime)s - %(levelname)s - %(message)s")
+
 last_values = {
     "V": None, "I": None, "VPV": None, "PPV": None,
     "IL": None, "H19": None, "H20": None, "H21": None, "H22": None, "HSDS": None
 }
 
-# logging.basicConfig(filename="/dev/shm/logs/mppt.log", level=logging.INFO, format="%(asctime)s - %(message)s")
+def write_status(status_line):
+    with open(STATUS_FILE, 'w') as f:
+        f.write(status_line.strip() + "\n")
 
 def on_connect(client, userdata, flags, rc):
-    print(f"[MQTT] Connected with result code {rc}")
-    pass
+    logging.info(f"[MQTT] Connected with result code {rc}")
 
 def find_serial_port():
     ports = glob.glob("/dev/ttyUSB*")
@@ -61,10 +71,11 @@ def connect_serial():
         try:
             port = find_serial_port()
             ser = serial.Serial(port, BAUD_RATE, timeout=2)
-            print(f"[INFO] Connected to {port}")
+            logging.info(f"[INFO] Connected to {port}")
             return ser
         except Exception as e:
-            print(f"[ERROR] Serial connection failed: {e}. Retrying in 5s...")
+            logging.error(f"Serial connection failed: {e}. Retrying in 5s...")
+            write_status(f"ERROR {datetime.utcnow().isoformat()} serial connect fail")
             time.sleep(5)
 
 def connect_mqtt():
@@ -74,10 +85,11 @@ def connect_mqtt():
         try:
             client.connect(MQTT_BROKER, MQTT_PORT, 60)
             client.loop_start()
-            print(f"[MQTT] Connected to {MQTT_BROKER}")
+            logging.info(f"[MQTT] Connected to {MQTT_BROKER}")
             return client
         except Exception as e:
-            print(f"[ERROR] MQTT connection failed: {e}. Retrying in 5s...")
+            logging.error(f"MQTT connection failed: {e}. Retrying in 5s...")
+            write_status(f"ERROR {datetime.utcnow().isoformat()} mqtt connect fail")
             time.sleep(5)
 
 def read_mppt():
@@ -91,7 +103,6 @@ def read_mppt():
             while ser.in_waiting:
                 line = ser.readline().decode("utf-8", errors="ignore").strip()
                 if line:
-                    # print(f"[SERIAL] Raw Data: {line}")
                     key, value = parse_mppt_data(line)
                     if key and value is not None:
                         last_values[key] = value
@@ -99,22 +110,26 @@ def read_mppt():
             current_time = time.time()
             if current_time - last_publish >= update_interval:
                 payload = ",".join(str(last_values[k]) if last_values[k] is not None else "0" for k in last_values)
-                #logging.info(f"Published: {payload}")
                 client.publish(MQTT_TOPIC, payload, qos=1)
+                logging.info(f"Published: {payload}")
                 print(f"[MQTT] Published: {MQTT_TOPIC} → {payload}")
+                status_summary = f"OK {datetime.utcnow().isoformat()} V={last_values['V']} I={last_values['I']} PPV={last_values['PPV']}"
+                write_status(status_summary)
                 last_publish = current_time
 
-            time.sleep(1.0)  # Check every 1 second
+            time.sleep(1.0)
 
     except KeyboardInterrupt:
-        print("[INFO] Shutting down...")
+        logging.info("[INFO] Shutting down...")
     except Exception as e:
-        print(f"[ERROR] Unexpected error: {e}")
+        logging.error(f"[ERROR] Unexpected error: {e}")
+        write_status(f"ERROR {datetime.utcnow().isoformat()} runtime exception")
     finally:
         ser.close()
         client.loop_stop()
         client.disconnect()
-        print("[INFO] Connections closed")
+        logging.info("[INFO] Connections closed")
 
 if __name__ == "__main__":
     read_mppt()
+
