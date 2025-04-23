@@ -1,75 +1,108 @@
-### 🛠 Troubleshooting – System Monitoring & Logs
+# 📚 Troubleshooting Guide
 
-All logs are saved to the **external SSD** at:
+This document helps you diagnose and resolve issues in the RBPi-AP_Terra project.
 
-```bash
-/mnt/ssd/logs/
+---
+
+## 🛠️ General Debug Tips
+
+- Use `journalctl -u <service>` to view service logs
+- Use `tail -f /mnt/ssd/logs/watchdog.log` to monitor system health
+- Use `df -h` or `mount` to verify the SSD mount
+- All logs are saved on the SSD to preserve SD card lifespan
+
+---
+
+## ⚠️🔌 SSD Mounting: CRITICAL FOR SYSTEM FUNCTIONALITY
+
+All scripts and services in this project rely on the SSD being correctly mounted at:
+
+```
+/mnt/ssd
 ```
 
-> ⚠️ **Important:** If you can’t access logs, always verify that the SSD is properly mounted:
+If the SSD is **not mounted**, nothing will work:
+- ❌ Logging will fail (`Input/output error`)
+- ❌ Services will restart endlessly
+- ❌ Watchdog will report missing status files
+
+---
+
+### ✅ Check if it's mounted:
 ```bash
 mount | grep /mnt/ssd
 ```
-If it’s not mounted, try:
+
+Should return:
+```
+/dev/sda1 on /mnt/ssd type ext4 ...
+```
+
+---
+
+### 🛠 Auto-mount with `/etc/fstab`
+
+Ensure this line is in `/etc/fstab`:
+
+```fstab
+UUID=7abe1ab6-fec7-4970-bd78-ec4fa478ab4b  /mnt/ssd  ext4  defaults,nofail,x-systemd.device-timeout=10  0  2
+```
+
+Replace the UUID with yours:
 ```bash
+sudo blkid
+```
+
+Then:
+```bash
+sudo systemctl daemon-reexec
 sudo mount -a
 ```
 
 ---
 
-#### 🔍 Check the watchdog
+### 🔄 Replacing the SSD or USB device?
 
-The watchdog monitors the health of all core scripts and logs issues here:
-
-```bash
-tail /mnt/ssd/logs/watchdog.log
-```
-
-This log reports:
-- Missing or stale `.status` files
-- Reported `ERROR` states from scripts
-- Timestamps and context for diagnosis
-
-To monitor live:
-```bash
-tail -f /mnt/ssd/logs/watchdog.log
-```
+1. Plug in the new device
+2. Find its UUID:
+   ```bash
+   sudo blkid
+   ```
+3. Replace the old UUID in `/etc/fstab`
+4. Reload systemd and remount:
+   ```bash
+   sudo systemctl daemon-reexec
+   sudo mount -a
+   ```
 
 ---
 
-#### 🔎 Check individual component logs
+## 🐛 Common Service Failures
 
-Each major script has its own log file in `/mnt/ssd/logs/`:
+### `mppt-mqtt.service` or `dht11-mqtt.service` fails?
 
-```bash
-tail /mnt/ssd/logs/mppt.log
-tail /mnt/ssd/logs/dht11.log
-tail /mnt/ssd/logs/router.log
-tail /mnt/ssd/logs/video_capture.log
-```
+- Check `/mnt/ssd/status/` exists and is writable
+- Watch for logs in:
+  ```bash
+  tail -f /mnt/ssd/logs/mppt.log
+  tail -f /mnt/ssd/logs/dht11.log
+  ```
 
-These contain MQTT messages, sensor data, camera feedback, and errors.
+### `watchdog_checker.py` reports errors?
 
----
-
-#### 🧹 Logs are automatically rotated
-
-- Rotation occurs daily or when a log exceeds 100KB
-- Logs are compressed (`.gz`) and kept for 14 days
-- Old logs are cleaned automatically
-- Managed by `logrotate` (config: `/etc/logrotate.d/uganda_logs`)
+- Look in `/mnt/ssd/logs/watchdog.log`
+- Check that all status files are updated by their respective services
+- If the SSD is not mounted, **nothing works**
 
 ---
 
-#### 🧠 Useful commands
+## 🧪 Verifying system health
 
-Quickly spot the latest issue:
-```bash
-grep "WARNING" /mnt/ssd/logs/watchdog.log | tail
-```
+- Confirm all services are active:
+  ```bash
+  systemctl list-units --type=service --state=running | grep mqtt
+  ```
+- Check `/mnt/ssd/status/*.status` files are updating every few seconds/minutes
+- Use Grafana dashboards to validate live data
 
-Check script heartbeat/status:
-```bash
-cat /mnt/ssd/status/*.status
-```
-
+---
