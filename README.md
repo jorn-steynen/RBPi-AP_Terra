@@ -42,8 +42,7 @@ This repository contains scripts, services, and documentation for a remote monit
 
 - **Video recording**: `videoscript.sh` runs hourly between 07:00 and 18:00.
 - **Camera toggle**: Turns camera on at 06:57–17:57 and off at 07:05–18:05.
-- **Watchdog check**: `check_system.py` can also be scheduled via cron if not run as a service.
-
+- **Watchdog check**: `check_system.py` checks the logs every 10 minutes.
 ---
 
 ## ⚙️ Setup & Installation
