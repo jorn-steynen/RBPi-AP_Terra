@@ -22,7 +22,7 @@ sudo apt install python3 python3-pip python3-serial ffmpeg git wireguard -y
 Install required Python packages globally:
 
 ```bash
-sudo pip3 install paho-mqtt pyserial pysnmp
+sudo apt install python3-paho-mqtt python3-serial python3-pysnmp -y
 ```
 
 ### 3. Clone the repository
@@ -85,6 +85,7 @@ sudo systemctl start example.service
 Repeat this for the relevant services:
 - mppt-mqtt.service
 - router-mqtt.service
+- dht11.service
 
 Other scripts, such as those for toggling the camera and recording video, are executed periodically via cronjobs instead of services. Make sure the crontab is configured accordingly.
 
