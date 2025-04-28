@@ -35,7 +35,8 @@ def write_status(line):
 def read_dht11():
     humidity, temperature = Adafruit_DHT.read(DHT_SENSOR, DHT_PIN, platform)
     if humidity is not None and temperature is not None:
-        return temperature, humidity
+        corrected_temp = temperature - 2.0  # Apply offset
+        return corrected_temp, humidity
     else:
         return None, None
 
