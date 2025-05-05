@@ -1,31 +1,34 @@
-# jan/27/1970 22:09:14 by RouterOS 6.48.6
-# software id = KEJ8-U8P1
-#
-# model = RB952Ui-5ac2nD
-# serial number = HD908CBK0A3
 /interface bridge
-add name=bridge-local
+add name=bridge1
+
 /interface ethernet
+set [ find default-name=ether1 ] poe-out=off
+set [ find default-name=ether2 ] poe-out=off
+set [ find default-name=ether3 ] poe-out=off
+set [ find default-name=ether4 ] poe-out=off
 set [ find default-name=ether5 ] poe-out=off
+
 /interface wireless
-set [ find default-name=wlan1 ] ssid=MikroTik
-set [ find default-name=wlan2 ] ssid=MikroTik
-/interface wireless security-profiles
-set [ find default=yes ] supplicant-identity=MikroTik
-/ip hotspot profile
-set [ find default=yes ] html-directory=hotspot
+set [ find default-name=wlan1 ] ssid=B-SaFFeR-2.4Gz
+set [ find default-name=wlan2 ] ssid=B-SaFFeR-5Gz
+set wlan1 disabled=yes
+set wlan2 disabled=yes
+
 /interface bridge port
-add bridge=bridge-local interface=ether1
-add bridge=bridge-local interface=ether2
-add bridge=bridge-local interface=ether3
-add bridge=bridge-local interface=ether4
-add bridge=bridge-local interface=ether5
+add bridge=bridge1 interface=ether1
+add bridge=bridge1 interface=ether2
+add bridge=bridge1 interface=ether3
+add bridge=bridge1 interface=ether4
+add bridge=bridge1 interface=ether5
+
 /ip dhcp-client
-add interface=bridge-local
+add interface=bridge1
+
 /ip service
 set telnet disabled=yes
 set ftp disabled=yes
 set www disabled=yes
 set www-ssl disabled=no
+
 /system identity
 set name=dumb-switch
