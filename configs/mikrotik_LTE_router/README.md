@@ -113,7 +113,7 @@ Make sure to use the correct config for each router. You can either adjust the `
 
 ---
 
-## 🧾 Reference: VPN Setup ([from guidebook](../docs/guidebook.md))
+## 🧾 Reference: VPN Setup ([from guidebook](https://github.com/jorn-steynen/RBPi-AP_Terra/blob/main/docs/guidebook.md))
 
 Each device connects to a WireGuard VPN server. Example configuration:
 
