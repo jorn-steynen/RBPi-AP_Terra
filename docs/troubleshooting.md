@@ -77,6 +77,58 @@ sudo mount -a
 
 ---
 
+### 🌀 Log Rotation
+
+To prevent log files from growing indefinitely and filling up the SSD, automatic log rotation is configured using `logrotate`.
+
+All `.log` files in `/mnt/ssd/logs/` are rotated using this configuration file:
+
+`/etc/logrotate.d/uganda_logs`
+
+#### 🔧 Rotation settings
+
+* Rotates logs when they exceed **100 KB**
+* Keeps up to **14 compressed backups**
+* Uses `copytruncate` to safely rotate even while the script is running
+* Skips empty files
+* Runs automatically via `systemd` using `logrotate.timer`
+
+#### 🔍 To verify the log rotation setup
+
+**Check if the timer is active:**
+
+```bash
+systemctl status logrotate.timer
+```
+
+**View the current rotation config:**
+
+```bash
+cat /etc/logrotate.d/uganda_logs
+```
+
+**Example content of `/etc/logrotate.d/uganda_logs`:**
+
+```conf
+/mnt/ssd/logs/*.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    missingok
+    notifempty
+    size 100k
+    maxage 14
+    dateext
+    copytruncate
+}
+```
+
+✅ This setup ensures that logs like `video_capture.log` and `watchdog.log` stay compact and won’t clog the SSD, even during long-term deployments in the field. These values and parameters can always be changed if wanted otherwise.
+
+---
+
+
 ## 🐛 Common Service Failures
 
 ### `mppt-mqtt.service` or `dht11-mqtt.service` fails?
