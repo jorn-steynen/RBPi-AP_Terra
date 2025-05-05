@@ -63,6 +63,7 @@ Contributions are welcome! If you want to suggest improvements or report bugs, f
 - The setup is optimized for power efficiency and long-term outdoor deployment.
 - Data is transmitted via 4G and accessed remotely over a VPN.
 - Designed to be low-maintenance and robust against power and network issues.
+- Log files are rotated automatically using logrotate to conserve SSD space.
 
 ---
 
