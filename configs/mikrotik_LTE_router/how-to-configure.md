@@ -123,4 +123,7 @@ This step will make recognizing which device it is easier.
   Run:
 
   ping 8.8.8.8
+
+and
+
   ping google.com
