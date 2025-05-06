@@ -1,3 +1,10 @@
+/system package update set channel=stable
+/system package update check-for-updates
+/system package update download-install
+
+/system clock
+set time-zone-name=Africa/Kampala
+
 /system identity
 set name=B-SaFFeR-LTE-Router
 
@@ -11,8 +18,11 @@ set [ find default-name=ether1 ] poe-out=off
 add bridge=bridge1 interface=ether1
 add bridge=bridge1 interface=wlan1
 
+/interface wireless security-profiles
+add name=wlan-sec-profile mode=dynamic-keys authentication-types=wpa2-psk wpa2-pre-shared-key="PresetPWD"
+
 /interface wireless
-set [ find default-name=wlan1 ] ssid=B-SaFFeR-LTE-WiFi disabled=yes
+set [ find default-name=wlan1 ] band=2ghz-b/g/n country=uganda disabled=yes frequency=auto mode=ap-bridge security-profile=wlan-sec-profile ssid=B-SaFFeR-LTE-WiFi wps-mode=disabled
 
 /interface lte apn
 add name=APN apn="apn.here" passthrough=no
@@ -48,6 +58,3 @@ set www disabled=yes
 set www-ssl disabled=no
 set api disabled=yes
 set api-ssl disabled=yes
-
-/system clock
-set time-zone-name=Africa/Kampala
