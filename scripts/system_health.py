@@ -2,59 +2,86 @@
 
 echo "===== 📋 System Health Check ====="
 
-# Check WireGuard VPN status (replace wg0 if your interface is different)
-echo -e "\n🔐 WireGuard VPN Status:"
-if systemctl is-active --quiet wg-quick@wg0; then
-    echo "[OK] WireGuard (wg0) is running ✅"
+# ✅ Function to print detailed service status with clear icons
+print_service_status() {
+    SERVICE_NAME="$1"
+    LABEL="$2"
+
+    echo -e "\n🔧 $LABEL ($SERVICE_NAME):"
+    ENABLED=$(systemctl is-enabled "$SERVICE_NAME" 2>/dev/null)
+    ACTIVE_STATE=$(systemctl show -p ActiveState --value "$SERVICE_NAME" 2>/dev/null)
+    SUB_STATE=$(systemctl show -p SubState --value "$SERVICE_NAME" 2>/dev/null)
+
+    echo "Enabled: $ENABLED"
+    echo "ActiveState: $ACTIVE_STATE"
+    echo "SubState: $SUB_STATE"
+
+    if [ "$ACTIVE_STATE" = "active" ]; then
+        echo -e "\e[32m[✅] $SERVICE_NAME is running\e[0m"
+    elif [ "$ACTIVE_STATE" = "inactive" ]; then
+        echo -e "\e[33m[⚠️] $SERVICE_NAME is inactive (might be expected)\e[0m"
+    elif [ "$ACTIVE_STATE" = "failed" ]; then
+        echo -e "\e[31m[❌] $SERVICE_NAME has failed\e[0m"
+    else
+        echo -e "\e[33m[ℹ️] $SERVICE_NAME status: $ACTIVE_STATE / $SUB_STATE\e[0m"
+    fi
+}
+
+# 🔐 WireGuard VPN (adjust wg0 if needed)
+print_service_status "wg-quick@wg0" "WireGuard VPN"
+
+# 🌡️ DHT11 Sensor Service
+print_service_status "dht11" "DHT11 Sensor Service"
+
+# 🔋 MPPT MQTT Service
+print_service_status "mppt-mqtt" "MPPT MQTT Service"
+
+# 📡 Router MQTT Service
+print_service_status "router-mqtt" "Router MQTT Service"
+
+# 🔄 Logrotate Timer (if it exists)
+if systemctl list-units --type=timer | grep -q "logrotate.timer"; then
+    print_service_status "logrotate.timer" "Logrotate Timer"
 else
-    echo "[ERROR] WireGuard (wg0) is NOT running ❌"
+    echo -e "\n🔄 Logrotate Timer:"
+    echo "[ℹ️] No logrotate.timer found (might be cron-based on this system)."
 fi
 
-# Check DHT11 sensor service
-echo -e "\n🌡️ DHT11 Sensor Service:"
-if systemctl is-active --quiet dht11; then
-    echo "[OK] dht11.service is running ✅"
-else
-    echo "[ERROR] dht11.service is NOT running ❌"
-fi
-
-# Check MPPT MQTT publisher service
-echo -e "\n🔋 MPPT MQTT Service:"
-if systemctl is-active --quiet mppt-mqtt; then
-    echo "[OK] mppt-mqtt.service is running ✅"
-else
-    echo "[ERROR] mppt-mqtt.service is NOT running ❌"
-fi
-
-# Check Router MQTT publisher service
-echo -e "\n📡 Router MQTT Service:"
-if systemctl is-active --quiet router-mqtt; then
-    echo "[OK] router-mqtt.service is running ✅"
-else
-    echo "[ERROR] router-mqtt.service is NOT running ❌"
-fi
-
-# Check Watchdog service
-echo -e "\n👀 Watchdog Service:"
-if systemctl is-active --quiet watchdog; then
-    echo "[OK] watchdog.service is running ✅"
-else
-    echo "[ERROR] watchdog.service is NOT running ❌"
-fi
-
-# Check Disk space (important mounts)
+# 💾 Disk Space (robust)
 echo -e "\n💾 Disk Space:"
-df -h | grep -E 'Filesystem|/mnt/ssd|/media/usb|/dev/root'
+MOUNTS=("/mnt/ssd" "/media/usb" "/")
 
-# Check Memory usage
+for MOUNT in "${MOUNTS[@]}"; do
+    if mountpoint -q "$MOUNT"; then
+        echo -e "\nDisk usage for $MOUNT:"
+        df -h "$MOUNT"
+    else
+        echo "$MOUNT is not mounted."
+    fi
+done
+
+# 🧠 Memory usage
 echo -e "\n🧠 Memory Usage:"
 free -h
 
-# Check CPU load
+# ⚙️ CPU Load
 echo -e "\n⚙️ CPU Load (last 1, 5, 15 min):"
 uptime | awk -F'load average:' '{ print $2 }'
 
-# Check pending uploads (adjust if your path is different)
+# 🌡️ CPU Temperature
+echo -e "\n🌡️ CPU Temperature:"
+if command -v vcgencmd &> /dev/null; then
+    TEMP=$(vcgencmd measure_temp | awk -F"=" '{print $2}')
+    echo "CPU Temp: $TEMP"
+elif [ -f /sys/class/thermal/thermal_zone0/temp ]; then
+    RAW_TEMP=$(cat /sys/class/thermal/thermal_zone0/temp)
+    TEMP_C=$(awk "BEGIN {printf \"%.1f°C\", $RAW_TEMP/1000}")
+    echo "CPU Temp: $TEMP_C"
+else
+    echo "[WARNING] Could not determine CPU temperature ❌"
+fi
+
+# 📂 Pending uploads
 VIDEO_DIR="/mnt/ssd/videos/pending_uploads"
 echo -e "\n📂 Pending Uploads in $VIDEO_DIR:"
 if [ -d "$VIDEO_DIR" ]; then
@@ -63,7 +90,17 @@ else
     echo "No pending uploads directory found."
 fi
 
-# Show recent watchdog log lines
+# 🗓️ User cronjobs (starting from '# m h  dom mon dow')
+echo -e "\n⏲️ User Cronjobs:"
+CRONTAB_CONTENT=$(crontab -l 2>/dev/null)
+if [ -n "$CRONTAB_CONTENT" ]; then
+    # Only display lines starting from '# m h  dom mon dow'
+    echo "$CRONTAB_CONTENT" | awk '/^# m h/ {p=1} p'
+else
+    echo "[WARNING] No cronjobs found for current user ❌"
+fi
+
+# 📝 Recent Watchdog Log
 WATCHDOG_LOG="/mnt/ssd/logs/watchdog.log"
 echo -e "\n📝 Recent Watchdog Log:"
 if [ -f "$WATCHDOG_LOG" ]; then
@@ -73,3 +110,4 @@ else
 fi
 
 echo -e "\n✅ Health check completed at $(date -Iseconds)."
+
