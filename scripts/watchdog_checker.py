@@ -7,6 +7,15 @@ import logging
 STATUS_DIR = "/mnt/ssd/status"
 LOG_FILE = "/mnt/ssd/logs/watchdog.log"
 
+"""
+Watchdog script for AP Terra field deployment.
+
+Monitors the freshness and contents of system status files under /mnt/ssd/status.
+Logs warnings if files are missing, stale, or contain error markers.
+Supports solar-aware night mode skipping for camera/video checks.
+"""
+
+
 # Custom max age for each file (in minutes)
 FILE_TIMEOUTS = {
     "video.status": 130,    # allow 2+ hours
