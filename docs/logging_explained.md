@@ -1,48 +1,44 @@
-1️⃣ Een **verklaring van hoe het geheel momenteel werkt**
-2️⃣ Een **korte lijst aanbevelingen** om het *nog iets te stroomlijnen of verbeteren*
----
+## 1️⃣ How it works – explanation
 
-## 1️⃣ Hoe het werkt – uitleg
+**What does the system do exactly?**
 
-**Wat doet het systeem precies?**
+### Log files and location
 
-### Logbestanden en locatie
-
-Alle logbestanden van het systeem (zoals `video_capture.log`, `watchdog.log`, `mppt.log`, enz.) worden opgeslagen in:
+All system logs (such as `video_capture.log`, `watchdog.log`, `mppt.log`, etc.) are stored in:
 
 ```
 /mnt/ssd/logs/
 ```
 
-Hierdoor blijven logbestanden weg van de SD-kaart van de Raspberry Pi, wat belangrijk is om slijtage van de SD-kaart te voorkomen en voldoende opslagcapaciteit te behouden.
+This keeps log files off the Raspberry Pi's SD card, which is important to prevent SD card wear and ensure enough storage space.
 
-### Logrotatie
+### Log rotation
 
-Om te voorkomen dat de logbestanden te groot worden en de SSD vollopen, is automatische logrotatie ingesteld via een configuratiebestand:
+To prevent log files from growing too large and filling up the SSD, automatic log rotation is configured using the following file:
 
 ```
 /etc/logrotate.d/uganda_logs
 ```
 
-Deze configuratie zorgt ervoor dat **alle .log-bestanden in `/mnt/ssd/logs/` automatisch worden geroteerd zodra ze groter worden dan 100 KB**. Tijdens rotatie gebeurt het volgende:
+This setup ensures that **all `.log` files in `/mnt/ssd/logs/` are rotated automatically as soon as they exceed 100 KB**. When a rotation occurs:
 
-* Het huidige logbestand wordt gecomprimeerd (bijvoorbeeld naar `.gz`).
-* Er worden maximaal 14 oude versies van elk logbestand bewaard.
-* Het actieve logbestand wordt niet verwijderd of verplaatst, maar leeggemaakt zodat het script kan blijven schrijven (**copytruncate**).
+* The current log file is compressed (e.g., into `.gz`).
+* Up to 14 old versions of each log file are kept.
+* The active log file is not deleted or moved but truncated in place so the script can keep writing (**copytruncate**).
 
-### Automatische uitvoering
+### Automatic execution
 
-Logrotate wordt automatisch uitgevoerd via systemd dankzij de timer:
+Log rotation is handled automatically via systemd using the timer:
 
 ```
 logrotate.timer
 ```
 
-Deze timer draait op de achtergrond en controleert dagelijks of logbestanden moeten worden geroteerd.
+This timer runs in the background and checks daily if any logs need to be rotated.
 
 ---
 
-### Voorbeeld van de logrotate-configuratie
+### Example of the logrotate configuration
 
 ```conf
 /mnt/ssd/logs/*.log {
@@ -59,123 +55,139 @@ Deze timer draait op de achtergrond en controleert dagelijks of logbestanden moe
 }
 ```
 
-Toelichting van de belangrijkste instellingen:
+Key settings explained:
 
-* `size 100k`: rotatie zodra een bestand groter wordt dan 100 KB.
-* `rotate 14`: bewaart maximaal 14 oude logbestanden.
-* `compress`: maakt oude logbestanden kleiner (gzip).
-* `copytruncate`: houdt het originele bestand actief maar maakt het leeg zodat het script blijft schrijven.
+* `size 100k`: rotates when a log exceeds 100 KB.
+* `rotate 14`: keeps a maximum of 14 rotated log files.
+* `compress`: compresses old logs (gzip).
+* `copytruncate`: truncates the active file in place so the script keeps writing smoothly.
 
 ---
 
-### Watchdog-systeem
+### Watchdog system
 
-Het script `watchdog_checker.py` controleert of de statusbestanden in `/mnt/ssd/status/` correct en recent genoeg zijn bijgewerkt. Voorbeelden:
+The `watchdog_checker.py` script monitors whether the status files in `/mnt/ssd/status/` are updated and fresh. For example:
 
-* `mppt.status` moet minstens elke 5 minuten worden bijgewerkt.
-* `video.status` mag maximaal 130 minuten oud zijn.
+* `mppt.status` must be updated at least every 5 minutes.
+* `video.status` can be up to 130 minutes old.
 
-Als een bestand ontbreekt, te oud is, of een foutmelding bevat (regel begint met `ERROR`), wordt een waarschuwing geschreven naar:
+If a file is missing, too old, or contains an error (the line starts with `ERROR`), a warning is logged to:
 
 ```
 /mnt/ssd/logs/watchdog.log
 ```
 
-Het script kan desgewenst een automatische herstart van het systeem uitvoeren wanneer een probleem wordt vastgesteld (momenteel staat deze functie uitgecommentarieerd in het script).
+Optionally, the script can trigger a system reboot if something goes wrong (this feature is currently commented out in the script).
 
-De watchdog voert dus voortdurend controles uit en zorgt ervoor dat problemen snel worden gesignaleerd via logging.
-
----
-
-### Overzicht van de werking
-
-* Elk script of proces schrijft zijn logbestanden weg naar `/mnt/ssd/logs/`.
-* De watchdog controleert of alle statusbestanden up-to-date zijn en logt zijn bevindingen in `watchdog.log`.
-* Logrotate zorgt ervoor dat alle logbestanden niet te groot worden en oude logs automatisch worden samengevoegd en bewaard.
-* Dit proces draait volledig automatisch dankzij systemd (logrotate.timer).
+The watchdog continuously checks and logs any issues, ensuring that problems are spotted quickly.
 
 ---
 
-## 2️⃣ Aanbevelingen om het te stroomlijnen
+### System overview
 
-Eigenlijk is je setup al **goed geregeld** qua logbeheer, maar enkele suggesties voor **duidelijkheid en onderhoudbaarheid**:
-
----
-
-**A. Maak een schema/diagram.**
-
-Een **visueel overzicht** helpt enorm:
-
-* pijltjes van scripts → logbestanden
-* logbestanden → logrotate → compressie
-* watchdog → statusbestanden → controle
-
-Dat maakt het voor iedereen overzichtelijk.
+* Each script or service writes its logs to `/mnt/ssd/logs/`.
+* The watchdog monitors the status files and writes its findings to `watchdog.log`.
+* Logrotate ensures logs don’t grow too large and keeps them compressed and tidy.
+* Everything runs automatically thanks to systemd (`logrotate.timer`).
 
 ---
 
-**B. Zet alle logging naar één standaardlogger.**
+### Table: logging and status overview
 
-Je scripts loggen los van elkaar. Het is netjes als ze **allemaal dezelfde logging-standaard gebruiken**. Je zou bijvoorbeeld:
+| **Script/Service**   | **Log file**                     | **Status file**               | **Purpose**                              |
+| -------------------- | -------------------------------- | ----------------------------- | ---------------------------------------- |
+| router.py            | /mnt/ssd/logs/router.log         | /mnt/ssd/status/router.status | Reads LTE signal & publishes via MQTT    |
+| read\_mppt.py        | /mnt/ssd/logs/mppt.log           | /mnt/ssd/status/mppt.status   | Reads MPPT data & publishes via MQTT     |
+| dht11.py             | /mnt/ssd/logs/dht11.log          | /mnt/ssd/status/dht11.status  | Reads temp/humidity & publishes via MQTT |
+| videoscript.sh       | /mnt/ssd/logs/video\_capture.log | /mnt/ssd/status/video.status  | Captures video & uploads to the server   |
+| toggle\_device.py    | /mnt/ssd/logs/toggle\_device.log | /mnt/ssd/status/toggle.status | Toggles GPIO power (e.g., camera on/off) |
+| watchdog\_checker.py | /mnt/ssd/logs/watchdog.log       | reads all status files        | Checks system health & logs status       |
 
-* Een kleine **logging-lib** maken die altijd schrijft naar `/mnt/ssd/logs/` + datumstempel.
-* Zo weet je zeker dat alle logs hetzelfde format hebben (maakt troubleshooten makkelijker).
-
----
-
-**C. Controleer je logrotate-run.**
-
-Kleine verbetering: logrotate **wordt getriggerd door een timer** maar als je echt wil weten of het goed werkt:
-
-* Bekijk de status met:
-  `systemctl status logrotate.timer`
-* En **forceren kan altijd** met:
-  `logrotate /etc/logrotate.conf`
-  (handig om te testen).
+*Note: I assumed you now also write a `toggle.status` or similar status file since it’s no longer empty. If that’s not the case, let me know!*
 
 ---
 
-**D. Service checks automatiseren.**
+## 2️⃣ Recommendations to streamline things
 
-In je Troubleshooting.md zeg je:
+The setup is already well-organized, but here are some suggestions to improve **clarity and maintainability:**
+
+---
+
+**A. Create a diagram.**
+
+A **visual overview** helps a lot:
+
+* Arrows from scripts → log files
+* Log files → logrotate → compression
+* Watchdog → reads status files → checks system health
+
+This makes it easier for anyone to understand the flow.
+
+---
+
+**B. Use a standard logging module everywhere.**
+
+Right now, each script sets up logging individually. It’s best practice to **centralize the logging setup** (e.g., a simple helper module that sets the log format and file). That ensures consistency across all scripts.
+
+---
+
+**C. Check the logrotate operation.**
+
+Even though logrotate runs automatically via systemd, it’s good to occasionally check:
+
+* View status:
+
+  ```bash
+  systemctl status logrotate.timer
+  ```
+* Manually trigger a rotation to test:
+
+  ```bash
+  logrotate /etc/logrotate.conf --debug
+  ```
+
+---
+
+**D. Automate service health checks.**
+
+In your `Troubleshooting.md`, you have:
 
 ```bash
 systemctl list-units --type=service --state=running | grep mqtt
 ```
 
-Misschien handiger om een **scriptje** te maken zoals `health_check.sh` dat alles samen checkt (VPN, MQTT, watchdog, ruimte SSD), zodat je maar 1 commando hoeft te doen.
+It might be more user-friendly to create a `health_check.sh` script that checks **VPN, MQTT, watchdog status, disk space**, etc., so you only need to run one command.
 
 ---
 
-**E. Logs scheiden per script.**
+**E. Keep logs separated per script.**
 
-Je doet dit nu eigenlijk al prima! Maar: soms loggen scripts naar *dezelfde* logfile (bijvoorbeeld video + watchdog samen), en dat kan verwarrend zijn. Houd per script een eigen logfile aan → dat maakt het netjes.
+You're already doing this well: each script has its own log file (like `mppt.log`, `router.log`...), which keeps everything clear and easy to debug.
 
 ---
 
-**F. Overweeg rotating maxage.**
+**F. Consider the `maxage` setting.**
 
-Je hebt nu:
+Right now:
 
 ```conf
 maxage 14
 ```
 
-Dat is goed, maar: stel dat je een tijd géén logging hebt, dan gooit logrotate oude logs na 14 dagen toch weg. Dat is prima maar wees je er bewust van: als je *permanent logs wilt bewaren*, zet `maxage` lager of weg.
+This means that even small logs older than 14 days will be rotated out. If you want to **keep all logs regardless of age** (especially since you have a 1TB SSD), you could remove `maxage` entirely and rely only on the file size to trigger rotation.
 
 ---
 
-## Conclusie
+## Conclusion
 
-* Je huidige setup is goed geregeld: **logfiles op SSD**, **logrotate om te voorkomen dat het volloopt**, en een **watchdog** die checkt of alles nog werkt.
-* Voor duidelijkheid:
+* The current setup is solid: **log files to SSD**, **logrotate prevents overflow**, and the **watchdog ensures system health.**
+* To make it even clearer:
 
-  * Voeg een **diagram** toe aan je documentatie.
-  * Misschien een **samenvattende tabel** van welke service naar welk logbestand schrijft.
-* Kleine verbeteringen (optioneel):
+  * Add a **diagram** and keep the overview table up to date.
+  * Optional improvements:
 
-  * Zorg dat alle scripts dezelfde logging-aanpak gebruiken.
-  * Overweeg een enkel script om alle healthchecks samen te tonen.
-  * Zorg dat je een keer handmatig test of logrotate werkt zoals verwacht.
+    * Standardize logging setup across scripts.
+    * Build a single health-check script.
+    * Regularly test logrotate works as expected.
 
-Laat weten of je wilt dat ik een schema maak of dat ik bijvoorbeeld een stuk tekst aanpas in je Troubleshooting.md om het overzichtelijker te maken!
+
