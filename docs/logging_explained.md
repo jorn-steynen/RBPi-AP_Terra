@@ -106,6 +106,11 @@ The watchdog continuously checks and logs any issues, ensuring that problems are
 *Note: I assumed you now also write a `toggle.status` or similar status file since it’s no longer empty. If that’s not the case, let me know!*
 
 ---
+## Diagram
+
+![diagram](https://github.com/user-attachments/assets/8beee755-ed5f-4c70-aa3a-1bf7864e4b1b)
+
+---
 
 ## 2️⃣ Recommendations to streamline things
 
