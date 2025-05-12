@@ -59,4 +59,3 @@ chmod +x install.sh
 
 ---
 
-Ready to go? You're one command away from getting your remote Pi setup rolling! 🌍📡⚡
