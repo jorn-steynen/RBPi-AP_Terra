@@ -1,0 +1,17 @@
+[Unit]
+Description=MPPT to MQTT Service
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+ExecStart=/usr/bin/python3 /home/uganda2/uganda_tests/scripts/solar_readout/read_mppt.py
+Restart=always
+RestartSec=10
+User=uganda2
+WorkingDirectory=/home/uganda2/uganda_tests/scripts/solar_readout/
+StandardOutput=null
+StandardError=null
+
+[Install]
+WantedBy=multi-user.target
+
