@@ -4,11 +4,11 @@ After=network-online.target
 Wants=network-online.target
 
 [Service]
-ExecStart=/usr/bin/python3 /home/uganda2/uganda_tests/scripts/solar_readout/read_mppt.py
+ExecStart=/usr/bin/python3 /home/rob-1/RBPi-AP_Terra/scripts/solar_readout/read_mppt.py
 Restart=always
 RestartSec=10
 User=uganda2
-WorkingDirectory=/home/uganda2/uganda_tests/scripts/solar_readout/
+WorkingDirectory=/home/rob-1/RBPi-AP_Terra/scripts/solar_readout/
 StandardOutput=null
 StandardError=null
 
