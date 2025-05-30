@@ -11,7 +11,7 @@ MQTT_PORT = 1883
 MQTT_TOPIC = "router/1"
 
 # SNMP settings
-ROUTER_IP = "192.168.100.1"
+ROUTER_IP = "192.168.88.1"
 COMMUNITY = "public1"
 VERSION = "2c"
 
