@@ -1,5 +1,5 @@
 #!/bin/bash
-
+export PATH=$PATH:$HOME/minio-binaries/
 # Load .env from script directory
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ENV_FILE="$SCRIPT_DIR/.env"
@@ -34,7 +34,7 @@ else
     sudo mkdir -p "$SSD_MOUNT_POINT"
     if output=$(sudo mount -t ext4 "$SSD_DEVICE" "$SSD_MOUNT_POINT" 2>&1); then
         echo "[INFO] Mounted SSD successfully."
-        sudo chown uganda2:uganda2 "$SSD_MOUNT_POINT"
+        sudo chown rob-1:rob-1 "$SSD_MOUNT_POINT"
         USE_RAM=false
     else
         echo "[ERROR] Failed to mount SSD: $output"
